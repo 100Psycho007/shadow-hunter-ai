@@ -1,0 +1,66 @@
+{
+  "target": "example.com",
+  "scan_date": "2025-01-15",
+  "subdomains": [
+    "www.example.com",
+    "mail.example.com",
+    "ftp.example.com",
+    "api.example.com",
+    "admin.example.com",
+    "dev.example.com",
+    "staging.example.com",
+    "blog.example.com",
+    "shop.example.com",
+    "support.example.com"
+  ],
+  "open_ports": {
+    "22": "ssh",
+    "80": "http",
+    "443": "https",
+    "21": "ftp",
+    "25": "smtp",
+    "53": "dns",
+    "110": "pop3",
+    "143": "imap",
+    "993": "imaps",
+    "995": "pop3s"
+  },
+  "vulnerabilities": [
+    {
+      "severity": "high",
+      "title": "Outdated SSH Server Version",
+      "description": "The SSH server is running an outdated version that may contain known security vulnerabilities. Consider updating to the latest stable version.",
+      "affected_service": "ssh",
+      "cve_id": "CVE-2023-38408"
+    },
+    {
+      "severity": "medium",
+      "title": "HTTP Security Headers Missing",
+      "description": "The web server is missing important security headers such as X-Frame-Options, X-Content-Type-Options, and Content-Security-Policy.",
+      "affected_service": "http",
+      "cve_id": null
+    },
+    {
+      "severity": "low",
+      "title": "Directory Listing Enabled",
+      "description": "Directory listing is enabled on the web server, which may expose sensitive file information to unauthorized users.",
+      "affected_service": "http",
+      "cve_id": null
+    },
+    {
+      "severity": "critical",
+      "title": "Default FTP Credentials",
+      "description": "The FTP server appears to be using default or weak credentials. This poses a significant security risk.",
+      "affected_service": "ftp",
+      "cve_id": null
+    },
+    {
+      "severity": "medium",
+      "title": "SSL Certificate Weak Cipher Suite",
+      "description": "The SSL certificate is configured to accept weak cipher suites that may be vulnerable to cryptographic attacks.",
+      "affected_service": "https",
+      "cve_id": null
+    }
+  ],
+  "ai_summary": null
+}

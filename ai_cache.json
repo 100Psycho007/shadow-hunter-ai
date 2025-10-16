@@ -1,0 +1,17 @@
+{
+  "093446f3ca999d19a681b7051eeccf2d": {
+    "summary": "Batch summary",
+    "timestamp": 1760625821.5778463,
+    "target": "target0.com"
+  },
+  "bc2bb5823eeefa30dae43ae7839c5e84": {
+    "summary": "Batch summary",
+    "timestamp": 1760625821.678967,
+    "target": "target1.com"
+  },
+  "e8be411470d83214b29dd17b9e7c7d4c": {
+    "summary": "Batch summary",
+    "timestamp": 1760625821.7803142,
+    "target": "target2.com"
+  }
+}
