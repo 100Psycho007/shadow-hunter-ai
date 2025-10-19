@@ -59,8 +59,8 @@ A clean, intuitive cybersecurity analytics tool for analyzing reconnaissance sca
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd ai-threat-hunting-dashboard
+   git clone https://github.com/100Psycho007/shadow-hunter-ai.git
+   cd shadow-hunter-ai
    ```
 
 2. **Install dependencies**
