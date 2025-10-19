@@ -1,0 +1,44 @@
+{
+  "target": "testcorp.com",
+  "scan_date": "2025-01-16",
+  "subdomains": [
+    "www.testcorp.com",
+    "mail.testcorp.com",
+    "vpn.testcorp.com",
+    "intranet.testcorp.com",
+    "api.testcorp.com",
+    "cdn.testcorp.com"
+  ],
+  "open_ports": {
+    "22": "ssh",
+    "80": "http",
+    "443": "https",
+    "3389": "rdp",
+    "1433": "mssql",
+    "8080": "http-proxy"
+  },
+  "vulnerabilities": [
+    {
+      "severity": "critical",
+      "title": "SQL Injection Vulnerability",
+      "description": "The application is vulnerable to SQL injection attacks through the login form parameter.",
+      "affected_service": "mssql",
+      "cve_id": "CVE-2023-12345"
+    },
+    {
+      "severity": "high",
+      "title": "Remote Desktop Protocol Exposed",
+      "description": "RDP service is exposed to the internet without proper access controls.",
+      "affected_service": "rdp",
+      "cve_id": null
+    },
+    {
+      "severity": "medium",
+      "title": "Weak SSL Configuration",
+      "description": "The SSL configuration allows weak cipher suites and protocols.",
+      "affected_service": "https",
+      "cve_id": null
+    }
+  ],
+  "ai_summary": null
+}

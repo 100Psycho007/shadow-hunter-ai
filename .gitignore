@@ -164,6 +164,13 @@ cython_debug/
 # Project specific
 reports/*.json
 !reports/sample.json
+!reports/testcorp.json
+
+# AI cache files (may contain sensitive data)
+ai_cache.json
+
+# Dependency management
+pip-tools-cache/
 assets/*.png
 assets/*.jpg
 assets/*.jpeg
@@ -173,3 +180,5 @@ assets/*.gif
 # API keys and secrets
 .env.local
 config.ini
+.dashboard_config.json
+ai_cache.json

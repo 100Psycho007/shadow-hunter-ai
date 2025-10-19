@@ -200,6 +200,16 @@ class ReportAnalytics:
         """
         if not reports:
             return []
+        
+        # If no filters provided or all filters are empty, return all reports
+        if not filters or not any([
+            filters.get('selected_targets'),
+            filters.get('date_range'),
+            filters.get('keyword_search', '').strip(),
+            filters.get('show_ai_summaries') is True
+        ]):
+            self.logger.debug(f"No active filters, returning all {len(reports)} reports")
+            return reports
             
         filtered_reports = reports.copy()
         
@@ -231,20 +241,14 @@ class ReportAnalytics:
             
             # Filter by AI summary presence
             show_ai_summaries = filters.get('show_ai_summaries')
-            if show_ai_summaries is not None:
-                if show_ai_summaries:
-                    # Show only reports with AI summaries
-                    filtered_reports = [
-                        report for report in filtered_reports
-                        if report.get('ai_summary') is not None and report.get('ai_summary', '').strip()
-                    ]
-                else:
-                    # Show only reports without AI summaries
-                    filtered_reports = [
-                        report for report in filtered_reports
-                        if report.get('ai_summary') is None or not report.get('ai_summary', '').strip()
-                    ]
+            if show_ai_summaries is True:
+                # Only filter when explicitly set to True (show only reports with AI summaries)
+                filtered_reports = [
+                    report for report in filtered_reports
+                    if report.get('ai_summary') is not None and report.get('ai_summary', '').strip()
+                ]
                 self.logger.debug(f"After AI summary filter: {len(filtered_reports)} reports")
+            # When False or None, show all reports (no filtering by AI summary status)
             
             self.logger.info(f"Filtered {len(reports)} reports down to {len(filtered_reports)}")
             return filtered_reports

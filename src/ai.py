@@ -10,7 +10,7 @@ import os
 import json
 import time
 import hashlib
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Callable
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -34,7 +34,7 @@ class AIAnalyzer:
         self.api_key = api_key or self._get_api_key_from_env()
         self.timeout = timeout
         self.base_url = "https://openrouter.ai/api/v1"
-        self.model = "anthropic/claude-3-haiku"  # Fast, cost-effective model for summaries
+        self.model = "meta-llama/llama-3.2-3b-instruct:free"  # Free model for testing
         self.cache = {}  # In-memory cache for AI summaries
         
         # Configure session with retry strategy
@@ -66,6 +66,24 @@ class AIAnalyzer:
         """
         return self.api_key is not None and len(self.api_key.strip()) > 0
     
+    def check_api_key_format(self) -> tuple[bool, str]:
+        """
+        Check if the API key has the correct format.
+        
+        Returns:
+            Tuple of (is_valid, message)
+        """
+        if not self.api_key:
+            return False, "No API key provided"
+        
+        if not self.api_key.startswith('sk-or-'):
+            return False, "API key should start with 'sk-or-' (OpenRouter format)"
+        
+        if len(self.api_key) < 20:
+            return False, "API key appears too short"
+        
+        return True, "API key format looks correct"
+    
     def validate_api_key(self) -> bool:
         """
         Validate the API key by making a test request.
@@ -74,6 +92,12 @@ class AIAnalyzer:
             True if API key is valid, False otherwise
         """
         if not self.is_enabled():
+            print("API Key validation failed: No API key provided")
+            return False
+        
+        # Check API key format
+        if not self.api_key.startswith('sk-or-'):
+            print("API Key validation failed: Invalid format (should start with 'sk-or-')")
             return False
         
         try:
@@ -85,39 +109,64 @@ class AIAnalyzer:
             # Make a minimal test request
             test_payload = {
                 "model": self.model,
-                "messages": [{"role": "user", "content": "Test"}],
-                "max_tokens": 1
+                "messages": [{"role": "user", "content": "Hi"}],
+                "max_tokens": 5
             }
             
             response = self.session.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=test_payload,
-                timeout=10
+                timeout=15
             )
             
-            return response.status_code == 200
+            # Check for successful response
+            if response.status_code == 200:
+                return True
+            elif response.status_code == 401:
+                print("API Key validation failed: Invalid authentication - check your API key")
+                return False
+            elif response.status_code == 402:
+                print("API Key validation failed: Insufficient credits")
+                return False
+            elif response.status_code == 429:
+                print("API Key validation failed: Rate limit exceeded")
+                return False
+            else:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', {}).get('message', f'HTTP {response.status_code}')
+                    print(f"API Key validation failed: {error_msg}")
+                except:
+                    print(f"API Key validation failed: HTTP {response.status_code}")
+                return False
             
-        except Exception:
+        except requests.exceptions.Timeout:
+            print("API Key validation failed: Request timeout")
+            return False
+        except requests.exceptions.ConnectionError:
+            print("API Key validation failed: Connection error")
+            return False
+        except Exception as e:
+            print(f"API Key validation failed: {str(e)}")
             return False
     
     def _generate_cache_key(self, report: Dict[str, Any]) -> str:
-        """
-        Generate a cache key for a report to avoid duplicate API calls.
-        
-        Args:
-            report: Report dictionary
-            
-        Returns:
-            MD5 hash string to use as cache key
-        """
-        # Create a stable string representation of the report
+        """Generate a cache key for a report to avoid duplicate API calls."""
+        # Use same logic as ReportAICache.get_cache_key for consistency
         cache_data = {
             "target": report.get("target", ""),
             "scan_date": report.get("scan_date", ""),
             "subdomains": sorted(report.get("subdomains", [])),
             "open_ports": dict(sorted(report.get("open_ports", {}).items())),
-            "vulnerabilities": report.get("vulnerabilities", [])
+            "vulnerabilities": sorted([
+                {
+                    "severity": v.get("severity", ""),
+                    "title": v.get("title", ""),
+                    "description": v.get("description", "")
+                }
+                for v in report.get("vulnerabilities", [])
+            ], key=lambda x: (x["severity"], x["title"]))
         }
         
         cache_string = json.dumps(cache_data, sort_keys=True)
@@ -194,9 +243,7 @@ Keep the response concise but actionable for a security analyst."""
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/your-repo/ai-threat-hunting-dashboard",
-                "X-Title": "AI Threat Hunting Dashboard"
+                "Content-Type": "application/json"
             }
             
             prompt = self.format_prompt(report)
@@ -229,31 +276,45 @@ Keep the response concise but actionable for a security analyst."""
                 response_data = response.json()
                 
                 if "choices" in response_data and len(response_data["choices"]) > 0:
-                    summary = response_data["choices"][0]["message"]["content"].strip()
-                    
-                    # Cache the result
-                    self.cache[cache_key] = summary
-                    
-                    return summary
+                    choice = response_data["choices"][0]
+                    if "message" in choice and "content" in choice["message"]:
+                        summary = choice["message"]["content"].strip()
+                        
+                        # Check if summary is not empty
+                        if summary:
+                            # Cache the result
+                            self.cache[cache_key] = summary
+                            return summary
+                        else:
+                            print(f"AI API Warning: Empty summary returned for target {report.get('target', 'unknown')}")
+                            print(f"Full response: {response_data}")
+                            return None
+                    else:
+                        print(f"AI API Warning: Missing message content in response: {response_data}")
+                        return None
                 else:
-                    print(f"AI API Warning: Unexpected response format: {response_data}")
+                    print(f"AI API Warning: No choices in response: {response_data}")
                     return None
             
             elif response.status_code == 401:
-                print("AI API Error: Invalid API key")
-                return None
+                error_msg = "Invalid API key - please check your OpenRouter API key"
+                print(f"AI API Error: {error_msg}")
+                raise requests.exceptions.HTTPError(error_msg, response=response)
             
             elif response.status_code == 429:
-                print("AI API Error: Rate limit exceeded. Please try again later.")
-                return None
+                error_msg = "Rate limit exceeded - please wait and try again"
+                print(f"AI API Error: {error_msg}")
+                raise requests.exceptions.HTTPError(error_msg, response=response)
             
             elif response.status_code == 402:
-                print("AI API Error: Insufficient credits. Please check your OpenRouter account.")
-                return None
+                error_msg = "Insufficient credits - please check your OpenRouter account balance"
+                print(f"AI API Error: {error_msg}")
+                raise requests.exceptions.HTTPError(error_msg, response=response)
             
             else:
-                print(f"AI API Error: HTTP {response.status_code} - {response.text}")
-                return None
+                error_msg = f"API request failed with status {response.status_code}"
+                print(f"AI API Error: {error_msg} - {response.text}")
+                raise requests.exceptions.HTTPError(error_msg, response=response)
                 
         except requests.exceptions.Timeout:
             print(f"AI API Error: Request timed out after {self.timeout} seconds")
@@ -448,9 +509,33 @@ class ReportAICache:
         # Then check memory cache
         cache_key = self.get_cache_key(report)
         cache_entry = self.memory_cache.get(cache_key)
-        if cache_entry and isinstance(cache_entry, dict):
+        
+        if cache_entry is None:
+            return None
+            
+        # Normalize cache entry to consistent dict format
+        if isinstance(cache_entry, dict):
+            # Already in correct format
             return cache_entry.get("summary")
-        return cache_entry
+        else:
+            # Convert non-dict entry to dict format and store it back
+            summary_str = str(cache_entry) if cache_entry else None
+            if summary_str:
+                normalized_entry = {
+                    "summary": summary_str,
+                    "timestamp": time.time(),
+                    "target": report.get("target", "unknown")
+                }
+                self.memory_cache[cache_key] = normalized_entry
+                
+                # Persist the normalized entry to disk immediately
+                try:
+                    self.save_persistent_cache()
+                except Exception as e:
+                    print(f"Warning: Could not persist normalized cache entry: {e}")
+                
+                return summary_str
+            return None
     
     def cache_summary(self, report: Dict[str, Any], summary: str) -> None:
         """
@@ -499,9 +584,28 @@ class ReportAICache:
         Returns:
             Dictionary with cache statistics
         """
-        total_size = sum(len(entry["summary"]) for entry in self.memory_cache.values())
-        oldest_timestamp = min((entry["timestamp"] for entry in self.memory_cache.values()), default=0)
-        newest_timestamp = max((entry["timestamp"] for entry in self.memory_cache.values()), default=0)
+        total_size = 0
+        timestamps = []
+        
+        # Iterate entries defensively to handle malformed cache data
+        for entry in self.memory_cache.values():
+            # Skip non-dict entries
+            if not isinstance(entry, dict):
+                continue
+                
+            # Handle summary - treat missing as empty string
+            summary = entry.get("summary", "")
+            if summary:  # Only count non-empty summaries
+                total_size += len(str(summary))
+            
+            # Handle timestamp - collect only numeric timestamps
+            timestamp = entry.get("timestamp")
+            if isinstance(timestamp, (int, float)) and timestamp > 0:
+                timestamps.append(timestamp)
+        
+        # Compute min/max timestamps with defaults when empty
+        oldest_timestamp = min(timestamps) if timestamps else 0
+        newest_timestamp = max(timestamps) if timestamps else 0
         
         return {
             "cached_summaries": len(self.memory_cache),
@@ -586,7 +690,7 @@ class EnhancedAIAnalyzer(AIAnalyzer):
     
     def batch_generate_summaries(self, reports: List[Dict[str, Any]], 
                                 force_refresh: bool = False,
-                                progress_callback: Optional[callable] = None) -> Dict[str, str]:
+                                progress_callback: Optional[Callable[..., Any]] = None) -> Dict[str, str]:
         """
         Generate AI summaries for multiple reports with progress tracking.
         

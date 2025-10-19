@@ -1,8 +1,16 @@
-streamlit>=1.28.0
-plotly>=5.15.0
-pandas>=2.0.0
-requests>=2.31.0
-python-dateutil>=2.8.2
+# AI Threat Hunting Dashboard Requirements
+# Core dependencies for the cybersecurity analytics dashboard
 
-# Note: pyarrow is optional for pandas and not required for this dashboard
-# If you encounter installation issues with pyarrow, you can safely skip it
+# Web Framework & UI
+streamlit>=1.28.0              # Main web framework for the dashboard
+plotly>=5.15.0                 # Interactive charts and visualizations
+
+# Data Processing & Analysis  
+pandas>=2.0.0                  # Data manipulation and analysis
+numpy>=1.24.0                  # Numerical computing
+
+# HTTP & API Communication
+requests>=2.31.0               # HTTP library for OpenRouter API calls
+
+# Note: PyArrow is intentionally excluded to avoid compatibility issues
+# The dashboard is configured to work without PyArrow backend

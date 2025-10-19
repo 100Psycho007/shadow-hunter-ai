@@ -23,6 +23,7 @@ class ReportLoader:
     def __init__(self):
         """Initialize the ReportLoader."""
         self.logger = logging.getLogger(__name__)
+        self.errors = []  # Track loading errors
         
     def load_reports(self, directory_path: str) -> List[Dict]:
         """
@@ -35,10 +36,12 @@ class ReportLoader:
             List of parsed and validated report dictionaries
         """
         reports = []
+        self.errors = []  # Track errors for UI display
         
         # Check if directory exists
         if not os.path.exists(directory_path):
             self.logger.warning(f"Reports directory does not exist: {directory_path}")
+            self.errors.append(f"Reports directory does not exist: {directory_path}")
             return reports
             
         # Get all JSON files in the directory
@@ -55,10 +58,20 @@ class ReportLoader:
                 if report and self.validate_report_schema(report):
                     reports.append(report)
                     self.logger.debug(f"Successfully loaded report: {file_path}")
+                elif report is None:
+                    # JSON parsing failed
+                    error_msg = f"Failed to parse JSON file: {os.path.basename(file_path)}"
+                    self.errors.append(error_msg)
+                    self.logger.error(error_msg)
                 else:
-                    self.logger.warning(f"Invalid report schema in file: {file_path}")
+                    # Schema validation failed
+                    error_msg = f"Invalid report schema in file: {os.path.basename(file_path)}"
+                    self.errors.append(error_msg)
+                    self.logger.warning(error_msg)
             except Exception as e:
-                self.logger.error(f"Error processing file {file_path}: {str(e)}")
+                error_msg = f"Error processing file {os.path.basename(file_path)}: {str(e)}"
+                self.errors.append(error_msg)
+                self.logger.error(error_msg)
                 continue
                 
         self.logger.info(f"Loaded {len(reports)} valid reports from {len(json_files)} files")
